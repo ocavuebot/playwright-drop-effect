@@ -2,13 +2,7 @@
   "name": "playwright-drop-effect",
   "private": true,
   "type": "module",
-  "scripts": {
-    "serve": "http-server docs -p 4173 -c-1 --silent",
-    "test": "playwright test",
-    "report": "node scripts/report.js"
-  },
   "devDependencies": {
-    "@playwright/test": "^1.63.0",
-    "http-server": "^14.1.1"
+    "@playwright/test": "^1.63.0"
   }
 }

@@ -2,18 +2,12 @@ name: Test
 
 on:
   push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
   test:
     name: ${{ matrix.os }}-${{ matrix.browser }}
     runs-on: ${{ matrix.os }}-latest
-    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -21,48 +15,9 @@ jobs:
         browser: [chromium, firefox, webkit]
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-
       - run: npm ci
-
       - run: npx playwright install --with-deps ${{ matrix.browser }}
-
-      - name: Test
-        run: npx playwright test --project=${{ matrix.browser }}
-        env:
-          RESULT_OS: ${{ matrix.os }}
-
-      - name: Report
-        if: ${{ !cancelled() }}
-        run: node scripts/report.js results
-
-      - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: results-${{ matrix.os }}-${{ matrix.browser }}
-          path: results/
-          if-no-files-found: ignore
-
-  report:
-    name: report
-    needs: [test]
-    if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
-      - uses: actions/download-artifact@v4
-        with:
-          path: results
-          pattern: results-*
-
-      - name: Report
-        run: node scripts/report.js results
+      - run: npx playwright test --project=${{ matrix.browser }}
