@@ -12,8 +12,7 @@ The drop target sets `dropEffect = 'copy'` on `dragover`. The source must read `
 | --- | --- |
 | Chromium | `copy` |
 | Firefox | `copy` |
-| WebKit on macOS and Windows | `all` |
-| WebKit on Linux | see the workflow |
+| WebKit | `all` |
 
 ## Run it locally
 
