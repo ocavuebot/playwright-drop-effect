@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>dropEffect on dragend</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font:
+          14px/1.45 -apple-system,
+          'Segoe UI',
+          system-ui,
+          sans-serif;
+        margin: 0;
+        padding: 16px 20px 48px;
+        color: #1c1c1e;
+        background: #f6f6f7;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 14px;
+        margin: 18px 0 8px;
+      }
+      code {
+        font:
+          12px ui-monospace,
+          Menlo,
+          Consolas,
+          monospace;
+        background: #e9e9ec;
+        padding: 1px 4px;
+        border-radius: 3px;
+      }
+      .muted {
+        color: #555;
+        font-size: 12px;
+        word-break: break-all;
+      }
+      #source {
+        display: inline-block;
+        padding: 10px 14px;
+        background: #4338ca;
+        color: #fff;
+        border-radius: 6px;
+        cursor: grab;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      .zone {
+        display: block;
+        width: 100%;
+        max-width: 520px;
+        margin: 6px 0;
+        padding: 10px 12px;
+        border: 2px dashed #9a9aa2;
+        border-radius: 6px;
+        background: #fff;
+        min-height: 44px;
+        font: inherit;
+      }
+      .zone.over {
+        border-color: #4338ca;
+        background: #eef;
+      }
+      table {
+        border-collapse: collapse;
+        font-size: 12px;
+        background: #fff;
+      }
+      th,
+      td {
+        border: 1px solid #dcdce0;
+        padding: 4px 8px;
+        text-align: left;
+      }
+      th {
+        background: #efeff2;
+      }
+      td.bad {
+        background: #fde2e2;
+        font-weight: 600;
+      }
+      td.good {
+        background: #e3f6e8;
+      }
+      button,
+      select {
+        font: inherit;
+        padding: 4px 8px;
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin: 8px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1><code>dataTransfer.dropEffect</code> on <code>dragend</code></h1>
+    <div class="muted" id="env"></div>
+    <p>
+      Drag the purple box onto each zone. Each drag adds one row to the log. The <code>dragend</code> event on the
+      source must report the operation that the drop target accepted.
+    </p>
+
+    <div class="controls">
+      <label>
+        <code>effectAllowed</code> on the source
+        <select id="effect-allowed">
+          <option value="copyMove" selected>copyMove</option>
+          <option value="">not set (uninitialized)</option>
+          <option value="all">all</option>
+          <option value="move">move</option>
+          <option value="copy">copy</option>
+        </select>
+      </label>
+    </div>
+
+    <div id="source" draggable="true">Drag me</div>
+
+    <h2>Drop targets</h2>
+    <div class="zone" id="zone-default" data-mode="default" data-expected="move">
+      Zone 1: calls <code>preventDefault()</code> on <code>dragover</code>, does not set <code>dropEffect</code>
+    </div>
+    <div class="zone" id="zone-move" data-mode="move" data-expected="move">
+      Zone 2: sets <code>dropEffect = 'move'</code>
+    </div>
+    <div class="zone" id="zone-copy" data-mode="copy" data-expected="copy">
+      Zone 3: sets <code>dropEffect = 'copy'</code>
+    </div>
+    <div class="zone" id="zone-reject" data-mode="reject" data-expected="none">
+      Zone 4: does not call <code>preventDefault()</code> (the drop is rejected)
+    </div>
+    <textarea class="zone" id="zone-textarea" data-mode="native" data-expected="copy" placeholder="Zone 5: native textarea"></textarea>
+
+    <h2>Log</h2>
+    <div class="controls">
+      <button id="copy-results">Copy results</button>
+      <button id="clear">Clear</button>
+      <span class="muted" id="status"></span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th><code>effectAllowed</code></th>
+          <th>Target</th>
+          <th>Modifiers</th>
+          <th><code>drop</code> fired</th>
+          <th><code>dropEffect</code> in <code>drop</code></th>
+          <th><code>dropEffect</code> in <code>dragend</code></th>
+          <th>Expected in <code>dragend</code></th>
+        </tr>
+      </thead>
+      <tbody id="log"></tbody>
+    </table>
+    <p class="muted">
+      The expected values are for <code>effectAllowed = 'copyMove'</code> with no modifier key. They are what Chrome,
+      Firefox, and Safari report for a real mouse drag.
+    </p>
+    <textarea id="results-text" style="width: 100%; height: 120px; display: none" readonly></textarea>
+
+    <script>
+      const rows = []
+      window.dropEffectRows = rows
+      let currentRow = null
+
+      document.getElementById('env').textContent = `${navigator.userAgent} | platform: ${navigator.platform}`
+
+      function modifiersOf(event) {
+        const names = []
+        if (event.altKey) names.push('Alt')
+        if (event.ctrlKey) names.push('Ctrl')
+        if (event.metaKey) names.push('Meta')
+        if (event.shiftKey) names.push('Shift')
+        return names.join('+')
+      }
+
+      const source = document.getElementById('source')
+      source.addEventListener('dragstart', (event) => {
+        const effectAllowed = document.getElementById('effect-allowed').value
+        event.dataTransfer.setData('text/plain', 'payload')
+        if (effectAllowed) event.dataTransfer.effectAllowed = effectAllowed
+        currentRow = {
+          effectAllowed: event.dataTransfer.effectAllowed,
+          target: null,
+          expected: null,
+          modifiers: '',
+          dropFired: false,
+          dropEffectInDrop: null,
+          dropEffectInDragend: null,
+        }
+      })
+      source.addEventListener('dragend', (event) => {
+        if (!currentRow) return
+        currentRow.dropEffectInDragend = event.dataTransfer.dropEffect
+        rows.push(currentRow)
+        currentRow = null
+        render()
+      })
+
+      for (const zone of document.querySelectorAll('.zone')) {
+        const mode = zone.dataset.mode
+        zone.addEventListener('dragenter', () => {
+          zone.classList.add('over')
+          if (currentRow) {
+            currentRow.target = zone.id
+            currentRow.expected = zone.dataset.expected
+          }
+        })
+        zone.addEventListener('dragleave', () => zone.classList.remove('over'))
+        zone.addEventListener('dragover', (event) => {
+          if (mode === 'default' || mode === 'move' || mode === 'copy') event.preventDefault()
+          if (mode === 'move' || mode === 'copy') event.dataTransfer.dropEffect = mode
+        })
+        zone.addEventListener('drop', (event) => {
+          zone.classList.remove('over')
+          if (mode !== 'native') event.preventDefault()
+          if (!currentRow) return
+          currentRow.target = zone.id
+          currentRow.expected = zone.dataset.expected
+          currentRow.dropFired = true
+          currentRow.dropEffectInDrop = event.dataTransfer.dropEffect
+          currentRow.modifiers = modifiersOf(event)
+        })
+      }
+
+      function render() {
+        const body = document.getElementById('log')
+        body.textContent = ''
+        rows.forEach((row, index) => {
+          const comparable = row.effectAllowed === 'copyMove' && !row.modifiers && row.expected
+          const cells = [
+            index + 1,
+            row.effectAllowed,
+            row.target ?? '(none)',
+            row.modifiers || '-',
+            row.dropFired ? 'yes' : 'no',
+            row.dropEffectInDrop ?? '-',
+            row.dropEffectInDragend,
+            comparable ? row.expected : '-',
+          ]
+          const tr = document.createElement('tr')
+          cells.forEach((value, cellIndex) => {
+            const td = document.createElement('td')
+            td.textContent = String(value)
+            if (cellIndex === 6 && comparable) td.className = row.dropEffectInDragend === row.expected ? 'good' : 'bad'
+            tr.append(td)
+          })
+          body.append(tr)
+        })
+      }
+
+      document.getElementById('copy-results').addEventListener('click', async () => {
+        const text = JSON.stringify({ userAgent: navigator.userAgent, platform: navigator.platform, rows }, null, 1)
+        const status = document.getElementById('status')
+        const fallback = document.getElementById('results-text')
+        try {
+          await navigator.clipboard.writeText(text)
+          status.textContent = 'Copied.'
+        } catch {
+          fallback.style.display = 'block'
+          fallback.value = text
+          fallback.select()
+          status.textContent = 'Clipboard is not available. Copy the text below.'
+        }
+      })
+
+      document.getElementById('clear').addEventListener('click', () => {
+        rows.length = 0
+        render()
+      })
+    </script>
+  </body>
+</html>
