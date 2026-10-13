@@ -1,0 +1,33 @@
+<!doctype html>
+<meta charset="UTF-8" />
+<title>dropEffect in dragend (copyMove, preventDefault only)</title>
+<style>
+  div {
+    padding: 20px;
+    border: 1px solid;
+  }
+</style>
+
+<div id="source" draggable="true">Drag me</div>
+<div id="target">Drop here</div>
+<p>dropEffect in dragend: <output id="result"></output></p>
+
+<script>
+  const source = document.getElementById('source')
+  const target = document.getElementById('target')
+  const result = document.getElementById('result')
+
+  source.addEventListener('dragstart', (event) => {
+    event.dataTransfer.setData('text/plain', 'data')
+    event.dataTransfer.effectAllowed = 'copyMove'
+  })
+  target.addEventListener('dragover', (event) => {
+    event.preventDefault()
+  })
+  target.addEventListener('drop', (event) => {
+    event.preventDefault()
+  })
+  source.addEventListener('dragend', (event) => {
+    result.textContent = event.dataTransfer.dropEffect
+  })
+</script>
